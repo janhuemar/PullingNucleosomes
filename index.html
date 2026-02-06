@@ -82,14 +82,53 @@
     }
     button:hover { background: #f9fafb; }
 
-    .sectionTitle {
+    /* Scrollable controls box */
+    .controlsScroll {
+      max-height: 58vh;     /* adjust if you want more/less */
+      overflow-y: auto;
+      padding-right: 6px;   /* space for scrollbar */
+    }
+
+    .controlsScroll::-webkit-scrollbar { width: 10px; }
+    .controlsScroll::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 10px;
+    }
+    .controlsScroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    /* Collapsible group header */
+    .groupHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+      padding: 8px 8px;
+      border-radius: 10px;
+      margin: 10px 0 6px 0;
+    }
+    .groupHeader:hover { background: #f9fafb; }
+
+    .groupTitle {
       font-size: 13px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--muted);
-      margin: 12px 0 6px 0;
+      margin: 0;
     }
+
+    .chev {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1;
+      transform: translateY(-1px);
+    }
+
+    .groupBody.collapsed { display: none; }
 
     .item {
       display: grid;
@@ -143,17 +182,20 @@
         <button onclick="showAll()">Show all</button>
         <button onclick="hideAll()">Hide all</button>
         <button onclick="showDefault()">Show default (1KX5)</button>
+        <button onclick="expandAll()">Expand all</button>
+        <button onclick="collapseAll()">Collapse all</button>
       </div>
 
       <div class="hr"></div>
 
-      <div class="muted">Shaded region indicates Standard Deviation.</div>
+      <div class="muted">Shaded region indicates Standard Deviation.
+ Click on the colored box to change the plotting color 
+ Tip: Legend clicks hide/show curves quickly.  </div>
 
       <div class="hr"></div>
 
-      <div id="controls"></div>
+      <div class="controlsScroll" id="controls"></div>
 
-      <div class="note">Tip: legend clicks hide/show curves quickly without removing them from the legend.</div>
     </div>
 
     <div class="panel" id="plotCard">
@@ -196,7 +238,7 @@ function tracesFor(item, colorHex) {
   const yLower = mean.map((v,i) => v - sd[i]).reverse();
   const yPoly = yUpper.concat(yLower);
 
-  const fill = rgbaFromHex(colorHex, 0.8);
+  const fill = rgbaFromHex(colorHex, 0.4);
 
   return [
     {
@@ -257,12 +299,29 @@ function buildControls() {
   root.innerHTML = "";
 
   const groups = DATA.groups;
-  Object.keys(groups).forEach((gname) => {
-    const h = document.createElement("div");
-    h.className = "sectionTitle";
-    h.textContent = gname;
-    root.appendChild(h);
+  Object.keys(groups).forEach((gname, gidx) => {
+    // header
+    const header = document.createElement("div");
+    header.className = "groupHeader";
+    header.innerHTML = `
+      <div class="groupTitle">${gname}</div>
+      <div class="chev" id="chev_${gidx}">▾</div>
+    `;
+    root.appendChild(header);
 
+    // body
+    const body = document.createElement("div");
+    body.className = "groupBody";
+    body.id = `group_${gidx}`;
+    root.appendChild(body);
+
+    // click header toggles collapse
+    header.addEventListener("click", () => {
+      const isCollapsed = body.classList.toggle("collapsed");
+      document.getElementById(`chev_${gidx}`).textContent = isCollapsed ? "▸" : "▾";
+    });
+
+    // items in group
     groups[gname].forEach((idx) => {
       const it = DATA.items[idx];
 
@@ -273,21 +332,18 @@ function buildControls() {
         <div class="labelText" id="lbl_${idx}" title="${it.label}">${it.label}</div>
         <input type="color" id="col_${idx}" value="${it.default_color}">
       `;
-      root.appendChild(row);
+      body.appendChild(row);
 
       document.getElementById("cb_" + idx).addEventListener("change", redraw);
       document.getElementById("col_" + idx).addEventListener("input", redraw);
 
-      document.getElementById("lbl_" + idx).addEventListener("click", () => {
+      document.getElementById("lbl_" + idx).addEventListener("click", (ev) => {
+        ev.stopPropagation(); // don't collapse group when clicking a label
         const cb = document.getElementById("cb_" + idx);
         cb.checked = !cb.checked;
         redraw();
       });
     });
-
-    const spacer = document.createElement("div");
-    spacer.style.height = "8px";
-    root.appendChild(spacer);
   });
 }
 
@@ -304,6 +360,22 @@ function showDefault() {
     document.getElementById("cb_" + idx).checked = (it.default_on === true);
   });
   redraw();
+}
+function expandAll() {
+  const bodies = document.querySelectorAll(".groupBody");
+  bodies.forEach((b, i) => {
+    b.classList.remove("collapsed");
+    const chev = document.getElementById("chev_" + i);
+    if (chev) chev.textContent = "▾";
+  });
+}
+function collapseAll() {
+  const bodies = document.querySelectorAll(".groupBody");
+  bodies.forEach((b, i) => {
+    b.classList.add("collapsed");
+    const chev = document.getElementById("chev_" + i);
+    if (chev) chev.textContent = "▸";
+  });
 }
 
 buildControls();
