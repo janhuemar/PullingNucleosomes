@@ -107,7 +107,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      cursor: pointer; /* clickable */
+      cursor: pointer;
       user-select: none;
     }
 
@@ -134,7 +134,7 @@
 <body>
 
   <div class="topbar">
-    <h1 class="title">A Goldilocks zone of DNA flexibility defines stable yet plastic nucleosomes, tuned by histone chemistry</h1>
+    <h1 class="title">A Goldilocks zone of DNA flexibility defines stable yet1 plastic nucleosomes, tuned by histone chemistry</h1>
   </div>
 
   <div class="wrap">
@@ -184,7 +184,7 @@ function getState() {
   return state;
 }
 
-function tracesFor(item, colorHex, visible) {
+function tracesFor(item, colorHex) {
   const d = DATA.data[item.id];
   const x = d.coor;
   const mean = d.free_mean;
@@ -195,10 +195,10 @@ function tracesFor(item, colorHex, visible) {
   const yLower = mean.map((v,i) => v - sd[i]).reverse();
   const yPoly = yUpper.concat(yLower);
 
-  const fill = rgbaFromHex(colorHex, 0.8); // alpha 80%
+  const fill = rgbaFromHex(colorHex, 0.8);
 
   return [
-    // SD band (grouped with line)
+    // SD band
     {
       x: xPoly, y: yPoly,
       type: "scatter",
@@ -208,8 +208,7 @@ function tracesFor(item, colorHex, visible) {
       fillcolor: fill,
       hoverinfo: "skip",
       showlegend: false,
-      legendgroup: item.id,
-      visible: visible ? true : "legendonly"
+      legendgroup: item.id
     },
     // mean line (legend item)
     {
@@ -219,20 +218,22 @@ function tracesFor(item, colorHex, visible) {
       name: item.label,
       line: {color: colorHex, width: 2.5},
       legendgroup: item.id,
-      // customdata used to map legend clicks back to checkboxes reliably
-      customdata: item.id,
-      visible: visible ? true : "legendonly"
+      customdata: item.id
     }
   ];
 }
 
+// IMPORTANT: only include checked items => legend contains only selected
 function buildAllTraces() {
   const state = getState();
   const traces = [];
+
   DATA.items.forEach((it) => {
     const st = state[it.id];
-    traces.push(...tracesFor(it, st.color, st.visible));
+    if (!st.visible) return;          // unchecked => not plotted, not in legend
+    traces.push(...tracesFor(it, st.color));
   });
+
   return traces;
 }
 
@@ -252,12 +253,10 @@ function redraw() {
   };
 
   Plotly.newPlot("plot", traces, layout, {responsive: true, displaylogo: false}).then((gd) => {
-    // Keep legend and checkboxes in sync:
-    // When user clicks a legend item, toggle the matching checkbox and re-draw.
     gd.on('plotly_legendclick', function(e) {
       const tr = gd.data[e.curveNumber];
-      const id = tr.customdata; // item.id from line trace
-      if (!id) return; // ignore if somehow missing
+      const id = tr.customdata;
+      if (!id) return;
 
       const idx = DATA.id_to_index[id];
       if (idx === undefined) return;
@@ -266,7 +265,7 @@ function redraw() {
       cb.checked = !cb.checked;
 
       redraw();
-      return false; // prevent Plotly's default toggle (we do it via redraw)
+      return false; // prevent default legend behavior; we do redraw ourselves
     });
   });
 }
@@ -275,7 +274,7 @@ function buildControls() {
   const root = document.getElementById("controls");
   root.innerHTML = "";
 
-  const groups = DATA.groups; // {Natural:[itemIdx...], Artificial:[...]}
+  const groups = DATA.groups;
   Object.keys(groups).forEach((gname) => {
     const h = document.createElement("div");
     h.className = "sectionTitle";
@@ -294,13 +293,9 @@ function buildControls() {
       `;
       root.appendChild(row);
 
-      // checkbox toggles
       document.getElementById("cb_" + idx).addEventListener("change", redraw);
-
-      // color changes
       document.getElementById("col_" + idx).addEventListener("input", redraw);
 
-      // clicking the label text toggles the checkbox too
       document.getElementById("lbl_" + idx).addEventListener("click", () => {
         const cb = document.getElementById("cb_" + idx);
         cb.checked = !cb.checked;
